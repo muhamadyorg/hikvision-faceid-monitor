@@ -1,6 +1,10 @@
 # Hikvision FaceID Monitoring Tizimi
 
-Hikvision kameralaridan real vaqtda keldi/ketti ma'lumotlarini qayd etish, davomat hisoboti va guruh boshqaruvi uchun professional monitoring tizimi.
+Hikvision kameralaridan real vaqtda keldi/ketti ma'lumotlarini qayd etish, davomat hisoboti va guruh boshqaruvi uchun professional monitoring tizimi (Uzbek tilida).
+
+**GitHub:** https://github.com/muhamadyorg/hikvision-faceid-monitor
+
+---
 
 ## Kirish ma'lumotlari (demo)
 
@@ -11,29 +15,29 @@ Hikvision kameralaridan real vaqtda keldi/ketti ma'lumotlarini qayd etish, davom
 | **Admin (Ombor)** | `admin_ombor` | `admin5678` |
 | **Ishchi** | `ali_v` | `worker1234` |
 
+---
+
 ## Imkoniyatlar
 
-- **Real-time kuzatuv**: WebSocket orqali jonli keldi/ketti hodisalari
-- **Rol asosida kirish**: sudo (to'liq) / admin (tayinlangan guruhlar) / ishchi (o'z ma'lumotlari)
-- **Guruh boshqaruvi**: Sudo guruh yaratadi, adminlarni biriktiradi
-- **Yagona sessiya**: Boshqa qurilmadan kirilsa, eski sessiya bekor qilinadi
-- **Takrorlanmaslik**: Kunlik birinchi kirish/chiqish alohida belgilanadi
-- **2 smena tizimi**: Har guruh uchun kungi/tungi smena
-- **Dam olish kunlari**: Admin tomonidan boshqariladi, hisobotda ko'rinadi
-- **Davomat hisoboti**: Sana bo'yicha chop etish/PDF
-- **PWA**: Mobil qurilmaga o'rnatish imkoni
-- **Kamera qo'llanmasi**: Bosqichma-bosqich ulash ko'rsatmasi
+- Real-time keldi/ketti kuzatuvi (WebSocket)
+- Rol asosida kirish: sudo / admin / ishchi
+- Guruh va smena boshqaruvi
+- Takrorlanmaslik: kunlik birinchi kirish/chiqish alohida belgilanadi
+- Dam olish kunlari boshqaruvi
+- Davomat hisoboti (chop etish/PDF)
+- PWA — mobil qurilmaga o'rnatish
+- Yagona sessiya: boshqa qurilmadan kirilsa, eski sessiya o'chiriladi
 
 ---
 
 ## Hikvision kamerani ulash
 
-Kamera quyidagi formatda `POST /api/events` manziliga so'rov yuborishi kerak:
+Kamera `POST /api/events` manziliga quyidagi formatda so'rov yuborishi kerak:
 
 ```json
 {
   "device_id": "kirish_eshigi",
-  "user_id": "1234",
+  "user_id": "1001",
   "event_type": "enter",
   "timestamp": "2024-01-15T08:30:00"
 }
@@ -41,114 +45,182 @@ Kamera quyidagi formatda `POST /api/events` manziliga so'rov yuborishi kerak:
 
 | Maydon | Tavsif |
 |--------|--------|
-| `device_id` | Kamera identifikatori (ixtiyoriy nom) |
-| `user_id` | FaceID tizimidagi xodim raqami |
+| `device_id` | Kamera identifikatori |
+| `user_id` | Hikvision FaceID tizimidagi xodim ID raqami |
 | `event_type` | `enter` yoki `exit` |
-| `timestamp` | ISO 8601 format (ixtiyoriy) |
+| `timestamp` | ISO 8601 (ixtiyoriy) |
 
-**Test uchun:**
-```bash
-curl -X POST https://sizning-domen.uz/api/events \
-  -H "Content-Type: application/json" \
-  -d '{"device_id":"hikvision_1","user_id":"1001","event_type":"enter"}'
+---
+
+## aPanel + Docker bilan VPS ga joylash
+
+### Umumiy ko'rinish
+
+```
+Internet → Nginx (80/443) → Docker container (port 5000)
+                                    ↓
+                             PostgreSQL (port 5432)
 ```
 
 ---
 
-## aPanel bilan o'rnatish
+### 1-qadam: VPS serverda Docker o'rnatish
 
-### 1. Server tayyorlash (Ubuntu 22.04)
+**Ubuntu 22.04 / Debian 12 uchun:**
 
 ```bash
+# Tizimni yangilash
 apt update && apt upgrade -y
 
-# Node.js 20 o'rnatish
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install -y nodejs
+# Docker o'rnatish (eng oson usul)
+curl -fsSL https://get.docker.com | bash
 
-# Tekshirish
-node --version   # v20.x.x
-npm --version    # 10.x.x
+# Docker Compose o'rnatish
+apt install -y docker-compose-plugin
+
+# Docker ishga tushganini tekshirish
+docker --version
+docker compose version
 ```
 
-### 2. PostgreSQL o'rnatish
+---
+
+### 2-qadam: Kodni serverga yuklash
 
 ```bash
-apt install -y postgresql postgresql-contrib
-systemctl start postgresql && systemctl enable postgresql
+# Git o'rnatish
+apt install -y git
 
-# Baza va foydalanuvchi yaratish
-sudo -u postgres psql << 'SQL'
-CREATE USER hikvision WITH PASSWORD 'kuchli_parol';
-CREATE DATABASE hikvision_db OWNER hikvision;
-GRANT ALL PRIVILEGES ON DATABASE hikvision_db TO hikvision;
-SQL
+# Papka yaratish
+mkdir -p /opt/hikvision
+cd /opt/hikvision
+
+# GitHub dan yuklash
+git clone https://github.com/muhamadyorg/hikvision-faceid-monitor .
 ```
 
-### 3. Ilovani yuklash
+---
+
+### 3-qadam: Muhit o'zgaruvchilarini sozlash
 
 ```bash
-mkdir -p /var/www/hikvision
-cd /var/www/hikvision
+cd /opt/hikvision
 
-# Git orqali
-git clone https://github.com/sizning-repo/hikvision .
+# .env fayl yaratish (.env.example dan nusxa)
+cp .env.example .env
 
-# Yoki ZIP fayl orqali
-# unzip hikvision.zip -d /var/www/hikvision/
+# Faylni tahrirlash
+nano .env
 ```
 
-### 4. O'rnatish
+`.env` fayl ichida quyidagilarni o'zgartiring:
 
-```bash
-cd /var/www/hikvision
-npm install
-npm run build
-```
-
-### 5. Muhit o'zgaruvchilari
-
-```bash
-cat > /var/www/hikvision/.env << 'ENV'
-DATABASE_URL=postgresql://hikvision:kuchli_parol@localhost:5432/hikvision_db
-SESSION_SECRET=eng_kamida_32_belgidan_iborat_maxfiy_kalit
+```env
+DATABASE_URL=postgresql://hikvision:KUCHLI_PAROL_BU_YERGA@db:5432/hikvision_db
+SESSION_SECRET=KAMIDA_32_BELGILI_TASODIFIY_KALIT_BU_YERGA
 NODE_ENV=production
 PORT=5000
-ENV
-
-chmod 600 /var/www/hikvision/.env
 ```
 
-### 6. Ma'lumotlar bazasini sozlash
+> **Muhim:** `KUCHLI_PAROL_BU_YERGA` o'rniga haqiqiy kuchli parol yozing. `SESSION_SECRET` uchun kamida 32 ta tasodifiy belgi ishlating.
 
+Tasodifiy kalit yaratish:
 ```bash
-cd /var/www/hikvision
-npm run db:push
+openssl rand -base64 32
 ```
 
-### 7. PM2 bilan boshqarish
+---
+
+### 4-qadam: docker-compose.yml ni sozlash
+
+`docker-compose.yml` faylini oching va `POSTGRES_PASSWORD` va `DATABASE_URL` ni `.env` dagi parol bilan moslashtiring:
 
 ```bash
-npm install -g pm2
-
-cd /var/www/hikvision
-pm2 start dist/index.js --name hikvision
-
-# Tizim yuklanganda avtomatik ishga tushirish
-pm2 startup
-pm2 save
-
-# Holat tekshirish
-pm2 status
-pm2 logs hikvision
+nano docker-compose.yml
 ```
 
-### 8. Nginx reverse proxy
+```yaml
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: hikvision_db
+      POSTGRES_USER: hikvision
+      POSTGRES_PASSWORD: KUCHLI_PAROL_BU_YERGA    # .env dagi bilan bir xil!
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hikvision -d hikvision_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://hikvision:KUCHLI_PAROL_BU_YERGA@db:5432/hikvision_db
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+---
+
+### 5-qadam: Docker image yaratish va ishga tushirish
 
 ```bash
-apt install -y nginx
+cd /opt/hikvision
 
-cat > /etc/nginx/sites-available/hikvision << 'NGINX'
+# Image yaratish (5-15 daqiqa ketadi)
+docker compose build
+
+# Ishga tushirish (background rejimida)
+docker compose up -d
+
+# Loglarni ko'rish
+docker compose logs -f app
+```
+
+Muvaffaqiyatli ishga tushganda logda:
+```
+>>> Ma'lumotlar bazasini tekshirish...
+>>> Ilova ishga tushirilmoqda...
+[express] serving on port 5000
+```
+
+---
+
+### 6-qadam: aPanel da Nginx sozlash
+
+**Variant A: aPanel (HestiaCP/ISPmanager) orqali**
+
+1. aPanel ga kiring → **Web** → **Qo'shish**
+2. Domain: `sizning-domen.uz`
+3. **Proxy Template** ni tanlang: `nginx-proxy` yoki `reverse-proxy`
+4. Proxy port: `5000`
+5. SSL: Let's Encrypt avtomatik
+
+**Variant B: Nginx ni qo'lda sozlash**
+
+```bash
+# nginx.conf faylini nusxa oling
+cp /opt/hikvision/nginx.conf /etc/nginx/sites-available/hikvision
+
+# Faylni tahrirlang - domain nomini o'zgartiring
+nano /etc/nginx/sites-available/hikvision
+```
+
+```nginx
 server {
     listen 80;
     server_name sizning-domen.uz www.sizning-domen.uz;
@@ -172,86 +244,53 @@ server {
         proxy_set_header Host $host;
     }
 }
-NGINX
+```
 
+```bash
+# Saytni yoqish
 ln -s /etc/nginx/sites-available/hikvision /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 ```
 
-### 9. SSL sertifikat (HTTPS)
+---
+
+### 7-qadam: SSL (HTTPS) o'rnatish
 
 ```bash
+# Certbot o'rnatish
 apt install -y certbot python3-certbot-nginx
+
+# SSL sertifikat olish
 certbot --nginx -d sizning-domen.uz -d www.sizning-domen.uz
 
-# Avtomatik yangilash
+# Avtomatik yangilash (har 90 kunda)
 systemctl enable certbot.timer
 ```
 
 ---
 
-## Docker bilan o'rnatish
+### 8-qadam: Demo ma'lumotlarni yuklash (ixtiyoriy)
 
 ```bash
-# Docker o'rnatish
-curl -fsSL https://get.docker.com | bash
-apt install -y docker-compose-plugin
+# Ishchi konteyner ichiga kirish
+docker compose exec app sh
 
-# Loyihani yuklash
-git clone https://github.com/sizning-repo/hikvision
-cd hikvision
+# Seed (demo ma'lumotlar)
+npx tsx server/seed.ts
 
-# Muhit sozlamalari
-cp .env.example .env
-nano .env   # DATABASE_URL va SESSION_SECRET ni o'zgartiring
-
-# Ishga tushirish
-docker compose up -d
-
-# Bazani sozlash
-docker compose exec app npm run db:push
-
-# Loglar
-docker compose logs -f
-```
-
-**docker-compose.yml namunasi:**
-```yaml
-version: '3.8'
-services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: hikvision
-      POSTGRES_PASSWORD: kuchli_parol
-      POSTGRES_DB: hikvision_db
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-  app:
-    build: .
-    ports:
-      - "5000:5000"
-    environment:
-      DATABASE_URL: postgresql://hikvision:kuchli_parol@db:5432/hikvision_db
-      SESSION_SECRET: maxfiy_kalit
-      NODE_ENV: production
-    depends_on:
-      - db
-
-volumes:
-  pgdata:
+# Konteynerdan chiqish
+exit
 ```
 
 ---
 
 ## Xodim qo'shish tartibi
 
-1. Hikvision qurilmasiga xodim yuzini va **user_id** raqamini kiriting (masalan: `1001`)
-2. Tizimga **admin** sifatida kiring
-3. **Ishchilar** sahifasiga o'ting → "Xodim qo'shish" tugmasini bosing
-4. `FaceID raqami: 1001`, `To'liq ismi: Xodim Ismi`ni kiriting
-5. Kerakli guruhni tanlang va saqlang
+1. Hikvision qurilmasida xodimning **user_id** raqamini belgilang (masalan: `1001`)
+2. Tizimga **admin** yoki **sudo** sifatida kiring
+3. **Ishchilar** → "Xodim qo'shish"
+4. `FaceID raqami: 1001`, `To'liq ismi: Xodim Ismi` kiriting
+5. Guruhni tanlang → Saqlang
 6. Endi qurilmadan o'tganda xodim ismi hisobotda ko'rinadi
 
 ---
@@ -259,43 +298,78 @@ volumes:
 ## Yangilash
 
 ```bash
-cd /var/www/hikvision
+cd /opt/hikvision
+
+# Yangi kodni yuklash
 git pull
-npm install
-npm run build
-npm run db:push   # Agar schema o'zgargan bo'lsa
-pm2 restart hikvision
+
+# Qayta build va ishga tushirish
+docker compose build
+docker compose up -d
+
+# Loglarni kuzating
+docker compose logs -f app
 ```
 
 ---
 
 ## Muammolarni hal qilish
 
-**Ilova ishlamayapti:**
+**Container ishlamayapti:**
 ```bash
-pm2 logs hikvision --lines 100
+docker compose logs app --tail=50
+docker compose ps
 ```
 
 **Baza ulanishi yo'q:**
 ```bash
-psql $DATABASE_URL -c "SELECT 1"
+docker compose exec app sh -c "node -e \"const {Pool}=require('pg');new Pool({connectionString:process.env.DATABASE_URL}).query('SELECT 1').then(()=>console.log('OK')).catch(e=>console.error(e.message))\""
 ```
 
 **Port band:**
 ```bash
-lsof -i :5000
-kill -9 $(lsof -ti:5000)
+ss -tlnp | grep 5000
 ```
 
-**Nginx xatosi:**
+**Konteyner ichida buyruq:**
 ```bash
-nginx -t
-tail -f /var/log/nginx/error.log
+docker compose exec app sh
 ```
 
-**Sessiya muammosi (kirish imkoni yo'q):**
+**Barcha konteynerlarni to'xtatish:**
 ```bash
-# Barcha sessiyalarni tozalash
-psql $DATABASE_URL -c "DELETE FROM session; DELETE FROM user_sessions;"
-pm2 restart hikvision
+docker compose down
 ```
+
+**Bazani to'liq tozalash (diqqat — ma'lumotlar o'chadi!):**
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+---
+
+## Tizim arxitekturasi
+
+```
+client/          → React + TypeScript (frontend)
+server/          → Express.js (backend API)
+shared/schema.ts → Drizzle ORM schema (umumiy)
+Dockerfile       → Docker image
+docker-compose.yml → Container orchestration
+nginx.conf       → Nginx konfiguratsiya namunasi
+```
+
+**Bazalar:**
+
+| Jadval | Maqsad |
+|--------|--------|
+| `users` | Foydalanuvchilar (sudo/admin/worker) |
+| `groups` | Guruhlar |
+| `group_admins` | Guruhga tayinlangan adminlar |
+| `group_workers` | Guruhdagi ishchilar |
+| `shifts` | Smenalar (kungi/tungi) |
+| `holidays` | Dam olish kunlari |
+| `events` | FaceID hodisalari |
+| `notification_configs` | Guruh bildirishnoma sozlamalari |
+| `user_sessions` | Yagona sessiya nazorati |
