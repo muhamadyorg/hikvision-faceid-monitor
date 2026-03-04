@@ -6,14 +6,25 @@ Hikvision kameralaridan real vaqtda keldi/ketti ma'lumotlarini qayd etish, davom
 
 ---
 
-## Kirish ma'lumotlari (demo)
+## Kirish ma'lumotlari
+
+Birinchi marta ishga tushirishdan oldin `.env` faylida quyidagi o'zgaruvchilarni o'rnating:
+
+```env
+SUDO_PASSWORD=kuchli_parol_bu_yerga
+ADMIN1_PASSWORD=admin_ofis_paroli
+ADMIN2_PASSWORD=admin_ombor_paroli
+WORKER_PASSWORD=ishchilar_paroli
+```
 
 | Rol | Login | Parol |
 |-----|-------|-------|
-| **Sudo** | `sudo` | `sudo1234` |
-| **Admin (Ofis)** | `admin_ofis` | `admin1234` |
-| **Admin (Ombor)** | `admin_ombor` | `admin5678` |
-| **Ishchi** | `ali_v` | `worker1234` |
+| **Sudo** | `sudo` | `.env` → `SUDO_PASSWORD` |
+| **Admin (Ofis)** | `admin_ofis` | `.env` → `ADMIN1_PASSWORD` |
+| **Admin (Ombor)** | `admin_ombor` | `.env` → `ADMIN2_PASSWORD` |
+| **Ishchi** | `ali_v` va boshqalar | `.env` → `WORKER_PASSWORD` |
+
+> Parollarni `.env` da o'rnatmasangiz, standart `changeme_*` parollar ishlatiladi — ularni **albatta** o'zgartiring!
 
 ---
 
