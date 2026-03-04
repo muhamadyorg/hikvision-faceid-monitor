@@ -128,7 +128,7 @@ export default function AdminsPage() {
             <Shield className="h-6 w-6 text-yellow-400" />
             Adminlar boshqaruvi
           </h1>
-          <p className="text-gray-400 text-sm mt-1">Tizim adminlarini qo'shish, tahrirlash va boshqarish</p>
+          <p className="text-muted-foreground text-sm mt-1">Tizim adminlarini qo'shish, tahrirlash va boshqarish</p>
         </div>
         {user?.role === "sudo" && (
           <Button onClick={openCreate} className="bg-yellow-600 hover:bg-yellow-700" data-testid="button-add-admin">
@@ -138,19 +138,19 @@ export default function AdminsPage() {
         )}
       </div>
 
-      <Card className="bg-gray-800 border-gray-700">
+      <Card className="bg-card border-border/60">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
+            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="border-gray-700">
-                  <TableHead className="text-gray-400">F.I.SH</TableHead>
-                  <TableHead className="text-gray-400">Login</TableHead>
-                  <TableHead className="text-gray-400">Parol</TableHead>
-                  <TableHead className="text-gray-400">Rol</TableHead>
-                  <TableHead className="text-gray-400 text-right">Amallar</TableHead>
+                <TableRow className="border-border/60">
+                  <TableHead className="text-muted-foreground">F.I.SH</TableHead>
+                  <TableHead className="text-muted-foreground">Login</TableHead>
+                  <TableHead className="text-muted-foreground">Parol</TableHead>
+                  <TableHead className="text-muted-foreground">Rol</TableHead>
+                  <TableHead className="text-muted-foreground text-right">Amallar</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -159,18 +159,18 @@ export default function AdminsPage() {
                     <TableCell colSpan={5} className="text-center text-gray-500 py-8">Admin topilmadi</TableCell>
                   </TableRow>
                 ) : admins.map((admin) => (
-                  <TableRow key={admin.id} className="border-gray-700 hover:bg-gray-700/50">
+                  <TableRow key={admin.id} className="border-border/60 hover:bg-secondary/50">
                     <TableCell className="text-white font-medium">{admin.fullName}</TableCell>
-                    <TableCell className="text-gray-300 font-mono text-sm">{admin.username || "—"}</TableCell>
+                    <TableCell className="text-foreground/80 font-mono text-sm">{admin.username || "—"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-gray-300">
+                        <span className="font-mono text-sm text-foreground/80">
                           {showPasswords[admin.id] ? (admin.plainPassword || "[o'rnatilmagan]") : "••••••••"}
                         </span>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-gray-500 hover:text-gray-300"
+                          className="h-7 w-7 text-gray-500 hover:text-foreground/80"
                           onClick={() => setShowPasswords(p => ({ ...p, [admin.id]: !p[admin.id] }))}
                           data-testid={`button-toggle-pass-${admin.id}`}
                         >
@@ -188,7 +188,7 @@ export default function AdminsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-gray-400 hover:text-white"
+                          className="h-8 w-8 text-muted-foreground hover:text-white"
                           onClick={() => openEdit(admin)}
                           data-testid={`button-edit-admin-${admin.id}`}
                         >
@@ -216,7 +216,7 @@ export default function AdminsPage() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingUser(null); }}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-white">
+        <DialogContent className="bg-background border-border/60 text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-yellow-400" />
@@ -225,9 +225,9 @@ export default function AdminsPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label className="text-gray-300">F.I.SH *</Label>
+              <Label className="text-foreground/80">F.I.SH *</Label>
               <Input
-                className="bg-gray-800 border-gray-600 text-white mt-1"
+                className="bg-card border-border text-white mt-1"
                 value={form.fullName}
                 onChange={e => setForm(p => ({ ...p, fullName: e.target.value }))}
                 placeholder="Ism Familiya"
@@ -236,9 +236,9 @@ export default function AdminsPage() {
               />
             </div>
             <div>
-              <Label className="text-gray-300">Login *</Label>
+              <Label className="text-foreground/80">Login *</Label>
               <Input
-                className="bg-gray-800 border-gray-600 text-white mt-1"
+                className="bg-card border-border text-white mt-1"
                 value={form.username}
                 onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
                 placeholder="login_nomi"
@@ -247,11 +247,11 @@ export default function AdminsPage() {
               />
             </div>
             <div>
-              <Label className="text-gray-300">
+              <Label className="text-foreground/80">
                 Parol {editingUser ? "(bo'sh qoldirsa o'zgarmaydi)" : "*"}
               </Label>
               <Input
-                className="bg-gray-800 border-gray-600 text-white mt-1"
+                className="bg-card border-border text-white mt-1"
                 type="text"
                 value={form.password}
                 onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
@@ -261,9 +261,9 @@ export default function AdminsPage() {
               />
             </div>
             <div>
-              <Label className="text-gray-300">Rol</Label>
+              <Label className="text-foreground/80">Rol</Label>
               <Select value={form.role} onValueChange={v => setForm(p => ({ ...p, role: v as "sudo" | "admin" }))}>
-                <SelectTrigger className="bg-gray-800 border-gray-600 text-white mt-1" data-testid="select-admin-role">
+                <SelectTrigger className="bg-card border-border text-white mt-1" data-testid="select-admin-role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
