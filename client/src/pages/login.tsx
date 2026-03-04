@@ -104,28 +104,6 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-6 pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center mb-2">Demo hisob ma'lumotlari:</p>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: "Sudo", u: "sudo", p: "sudo1234" },
-                  { label: "Admin", u: "admin", p: "admin1234" },
-                  { label: "User", u: "operator1", p: "user1234" },
-                ].map((demo) => (
-                  <Button
-                    key={demo.label}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    type="button"
-                    onClick={() => { setUsername(demo.u); setPassword(demo.p); }}
-                    data-testid={`button-demo-${demo.label.toLowerCase()}`}
-                  >
-                    {demo.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
 
