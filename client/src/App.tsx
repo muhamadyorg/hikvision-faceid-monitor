@@ -1,3 +1,4 @@
+import { type CSSProperties } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -14,8 +15,13 @@ import EventsPage from "@/pages/events";
 import ReportPage from "@/pages/report";
 import DevicesPage from "@/pages/devices";
 import UsersPage from "@/pages/users";
+import AdminsPage from "@/pages/admins";
 import GroupsPage from "@/pages/groups";
+import CameraGuidePage from "@/pages/camera-guide";
 import SettingsPage from "@/pages/settings";
+import WorkersPage from "@/pages/workers";
+import ShiftsPage from "@/pages/shifts";
+import HolidaysPage from "@/pages/holidays";
 import NotFound from "@/pages/not-found";
 
 function ProtectedLayout() {
@@ -43,7 +49,7 @@ function ProtectedLayout() {
   };
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
+    <SidebarProvider style={style as CSSProperties}>
       <div className="flex h-screen w-full bg-background">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
@@ -57,8 +63,13 @@ function ProtectedLayout() {
               <Route path="/events" component={EventsPage} />
               <Route path="/report" component={ReportPage} />
               <Route path="/devices" component={DevicesPage} />
+              <Route path="/admins" component={AdminsPage} />
               <Route path="/users" component={UsersPage} />
               <Route path="/groups" component={GroupsPage} />
+              <Route path="/camera-guide" component={CameraGuidePage} />
+              <Route path="/workers" component={WorkersPage} />
+              <Route path="/shifts" component={ShiftsPage} />
+              <Route path="/holidays" component={HolidaysPage} />
               <Route path="/settings" component={SettingsPage} />
               <Route component={NotFound} />
             </Switch>

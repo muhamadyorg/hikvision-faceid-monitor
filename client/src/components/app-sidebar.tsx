@@ -1,3 +1,4 @@
+import { type ElementType } from "react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -19,18 +20,23 @@ import {
   Activity,
   Monitor,
   Users,
+  UserCircle,
+  Shield,
+  Clock,
+  Umbrella,
   FolderOpen,
   Settings,
   LogOut,
   Camera,
   BarChart3,
   ClipboardList,
+  HelpCircle,
 } from "lucide-react";
 
 interface NavItem {
   title: string;
   url: string;
-  icon: React.ElementType;
+  icon: ElementType;
   roles?: string[];
 }
 
@@ -39,16 +45,20 @@ const navItems: NavItem[] = [
   { title: "Realtime", url: "/realtime", icon: Activity },
   { title: "Eventlar", url: "/events", icon: ClipboardList },
   { title: "Hisobot", url: "/report", icon: BarChart3 },
-  { title: "Qurilmalar", url: "/devices", icon: Monitor, roles: ["sudo", "admin"] },
-  { title: "Foydalanuvchilar", url: "/users", icon: Users, roles: ["sudo", "admin"] },
+  { title: "Ishchilar", url: "/workers", icon: UserCircle, roles: ["sudo", "admin"] },
+  { title: "Smenalar", url: "/shifts", icon: Clock, roles: ["sudo", "admin"] },
+  { title: "Bayramlar", url: "/holidays", icon: Umbrella, roles: ["sudo", "admin"] },
   { title: "Guruhlar", url: "/groups", icon: FolderOpen, roles: ["sudo", "admin"] },
+  { title: "Qurilmalar", url: "/devices", icon: Monitor, roles: ["sudo", "admin"] },
+  { title: "Adminlar", url: "/admins", icon: Shield, roles: ["sudo"] },
+  { title: "Kamera qo'llanma", url: "/camera-guide", icon: HelpCircle, roles: ["sudo"] },
   { title: "Sozlamalar", url: "/settings", icon: Settings, roles: ["sudo"] },
 ];
 
 const roleColors: Record<string, string> = {
   sudo: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   admin: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  user: "bg-green-500/20 text-green-400 border-green-500/30",
+  worker: "bg-green-500/20 text-green-400 border-green-500/30",
 };
 
 export function AppSidebar() {
@@ -100,8 +110,8 @@ export function AppSidebar() {
         {user && (
           <div className="flex items-center gap-2 px-1 mb-2">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">{user.username}</p>
-              <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${roleColors[user.role] || roleColors.user}`}>
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{user.fullName || user.username}</p>
+              <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${roleColors[user.role] || "bg-gray-500/20 text-gray-400 border-gray-500/30"}`}>
                 {user.role.toUpperCase()}
               </span>
             </div>

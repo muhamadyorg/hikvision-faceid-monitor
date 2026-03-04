@@ -169,7 +169,7 @@ export default function EventsPage() {
                     {ev.eventType === "enter" ? "KELDI" : "KETDI"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-foreground">{ev.personName}</p>
+                    <p className="font-medium text-sm text-foreground">{ev.resolvedName || ev.faceUserId || "Noma'lum"}</p>
                     <p className="text-xs text-muted-foreground">{ev.deviceId}</p>
                   </div>
                   <div className="text-right flex-shrink-0">

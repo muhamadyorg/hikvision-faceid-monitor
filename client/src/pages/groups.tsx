@@ -1,267 +1,319 @@
-import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { FolderOpen, Plus, Trash2, Edit, Users, Key, UserPlus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-interface GroupItem {
-  id: string;
-  name: string;
-  login: string;
-  createdAt: string;
-}
-
-interface UserItem {
-  id: string;
-  username: string;
-  role: string;
-}
+import { useState } from "react";
+import { Group, User, InsertGroup } from "@shared/schema";
+import { Loader2, Plus, Pencil, Trash2, Users, Shield, FolderOpen } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertGroupSchema } from "@shared/schema";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function GroupsPage() {
-  const { user: currentUser } = useAuth();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<GroupItem | null>(null);
-  const [joinOpen, setJoinOpen] = useState(false);
-  const [membersOpen, setMembersOpen] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", login: "", password: "" });
-  const [joinForm, setJoinForm] = useState({ login: "", password: "" });
-  const [addMemberUserId, setAddMemberUserId] = useState("");
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [assignType, setAssignType] = useState<"admin" | "worker">("admin");
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
-  const { data: groups, isLoading } = useQuery<GroupItem[]>({ queryKey: ["/api/groups"] });
-  const { data: allUsers } = useQuery<UserItem[]>({
+  const { data: groups, isLoading: groupsLoading } = useQuery<Group[]>({
+    queryKey: ["/api/groups"],
+  });
+
+  const { data: users } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: currentUser?.role === "sudo" || currentUser?.role === "admin",
-  });
-  const { data: members } = useQuery<UserItem[]>({
-    queryKey: [`/api/groups/${membersOpen}/members`],
-    enabled: !!membersOpen,
   });
 
-  const createMut = useMutation({
-    mutationFn: async (data: typeof form) => { const res = await apiRequest("POST", "/api/groups", data); return res.json(); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/groups"] }); setOpen(false); toast({ title: "Guruh qo'shildi" }); },
-    onError: (e: any) => toast({ title: "Xato", description: e.message, variant: "destructive" }),
-  });
-
-  const updateMut = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => { const res = await apiRequest("PUT", `/api/groups/${id}`, data); return res.json(); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/groups"] }); setOpen(false); setEditing(null); toast({ title: "Guruh yangilandi" }); },
-    onError: (e: any) => toast({ title: "Xato", description: e.message, variant: "destructive" }),
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: async (id: string) => { await apiRequest("DELETE", `/api/groups/${id}`); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/groups"] }); toast({ title: "Guruh o'chirildi" }); },
-  });
-
-  const joinMut = useMutation({
-    mutationFn: async (data: typeof joinForm) => { const res = await apiRequest("POST", "/api/groups/join", data); return res.json(); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/groups"] }); setJoinOpen(false); toast({ title: "Guruhga qo'shildingiz" }); },
-    onError: (e: any) => toast({ title: "Xato", description: e.message, variant: "destructive" }),
-  });
-
-  const addMemberMut = useMutation({
-    mutationFn: async ({ groupId, userId }: { groupId: string; userId: string }) => {
-      await apiRequest("POST", `/api/groups/${groupId}/members`, { userId });
+  const form = useForm<InsertGroup>({
+    resolver: zodResolver(insertGroupSchema),
+    defaultValues: {
+      name: "",
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/groups/${membersOpen}/members`] }); toast({ title: "A'zo qo'shildi" }); },
-    onError: (e: any) => toast({ title: "Xato", description: e.message, variant: "destructive" }),
   });
 
-  const removeMemberMut = useMutation({
-    mutationFn: async ({ groupId, userId }: { groupId: string; userId: string }) => {
-      await apiRequest("DELETE", `/api/groups/${groupId}/members/${userId}`);
+  const createMutation = useMutation({
+    mutationFn: async (data: InsertGroup) => {
+      const res = await apiRequest("POST", "/api/groups", data);
+      return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/groups/${membersOpen}/members`] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
+      setIsDialogOpen(false);
+      form.reset();
+      toast({ title: "Muvaffaqiyatli", description: "Guruh yaratildi" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Xatolik", description: error.message, variant: "destructive" });
+    },
   });
 
-  const openCreate = () => { setEditing(null); setForm({ name: "", login: "", password: "" }); setOpen(true); };
-  const openEdit = (g: GroupItem) => { setEditing(g); setForm({ name: g.name, login: g.login, password: "" }); setOpen(true); };
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertGroup> }) => {
+      const res = await apiRequest("PATCH", `/api/groups/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
+      setIsDialogOpen(false);
+      setEditingGroup(null);
+      form.reset();
+      toast({ title: "Muvaffaqiyatli", description: "Guruh nomi o'zgartirildi" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Xatolik", description: error.message, variant: "destructive" });
+    },
+  });
 
-  const handleSubmit = () => {
-    if (editing) {
-      const data: any = {};
-      if (form.name) data.name = form.name;
-      if (form.login) data.login = form.login;
-      if (form.password) data.password = form.password;
-      updateMut.mutate({ id: editing.id, data });
-    } else createMut.mutate(form);
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/groups/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
+      toast({ title: "Muvaffaqiyatli", description: "Guruh o'chirildi" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Xatolik", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async ({ groupId, type, userIds }: { groupId: string, type: "admin" | "worker", userIds: string[] }) => {
+      await apiRequest("POST", `/api/groups/${groupId}/${type}s`, { userIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
+      setIsAssignDialogOpen(false);
+      toast({ title: "Muvaffaqiyatli", description: "Foydalanuvchilar biriktirildi" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Xatolik", description: error.message, variant: "destructive" });
+    },
+  });
+
+  function onSubmit(data: InsertGroup) {
+    if (editingGroup) {
+      updateMutation.mutate({ id: editingGroup.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  }
+
+  const handleOpenAssign = (group: Group, type: "admin" | "worker") => {
+    setSelectedGroup(group);
+    setAssignType(type);
+    setSelectedUsers([]);
+    setIsAssignDialogOpen(true);
   };
 
-  const isSudoOrAdmin = currentUser?.role === "sudo" || currentUser?.role === "admin";
+  const filteredUsers = users?.filter(u => 
+    assignType === "admin" ? (u.role === "admin" || u.role === "sudo") : u.role === "worker"
+  ) || [];
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Guruhlar</h1>
-          <p className="text-muted-foreground text-sm">Foydalanuvchi guruhlarini boshqarish</p>
+          <h1 className="text-2xl font-bold">Guruhlar boshqaruvi</h1>
+          <p className="text-muted-foreground text-sm">Xodimlar guruhlarini boshqarish</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => { setJoinForm({ login: "", password: "" }); setJoinOpen(true); }} data-testid="button-join-group">
-            <Key className="w-4 h-4 mr-2" />
-            Guruhga qo'shilish
-          </Button>
-          {currentUser?.role === "sudo" && (
-            <Button onClick={openCreate} data-testid="button-add-group">
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) {
+            setEditingGroup(null);
+            form.reset();
+          }
+        }}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-add-group">
               <Plus className="w-4 h-4 mr-2" />
               Guruh qo'shish
             </Button>
-          )}
-        </div>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingGroup ? "Guruhni tahrirlash" : "Yangi guruh qo'shish"}</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Guruh nomi</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-group-name" placeholder="Masalan: Markaziy filial" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-group">
+                    {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Saqlash
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {isLoading ? (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {groupsLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="border-border/50">
-              <CardContent className="pt-6 space-y-3">
-                <Skeleton className="h-10 w-10 rounded-xl" />
-                <Skeleton className="h-5 w-32" />
-                <Skeleton className="h-4 w-24" />
+            <Card key={i}>
+              <CardHeader>
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </CardHeader>
+            </Card>
+          ))
+        ) : groups?.length === 0 ? (
+          <div className="col-span-full py-20 text-center border rounded-xl bg-muted/20">
+            <FolderOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+            <p className="text-muted-foreground">Hali guruhlar yaratilmagan</p>
+          </div>
+        ) : (
+          groups?.map((group) => (
+            <Card key={group.id} className="border-border/50 hover-elevate">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="text-lg">{group.name}</CardTitle>
+                    <CardDescription>ID: {group.id.split('-')[0]}</CardDescription>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8"
+                      onClick={() => {
+                        setEditingGroup(group);
+                        form.reset({ name: group.name });
+                        setIsDialogOpen(true);
+                      }}
+                      data-testid={`button-edit-group-${group.id}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => {
+                        if (confirm("Haqiqatan ham bu guruhni o'chirmoqchimisiz?")) {
+                          deleteMutation.mutate(group.id);
+                        }
+                      }}
+                      data-testid={`button-delete-group-${group.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full justify-start gap-2"
+                    onClick={() => handleOpenAssign(group, "admin")}
+                    data-testid={`button-assign-admins-${group.id}`}
+                  >
+                    <Shield className="w-4 h-4" />
+                    Adminlar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full justify-start gap-2"
+                    onClick={() => handleOpenAssign(group, "worker")}
+                    data-testid={`button-assign-workers-${group.id}`}
+                  >
+                    <Users className="w-4 h-4" />
+                    Ishchilar
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))
-        ) : groups?.map((g) => (
-          <Card key={g.id} className="border-border/50" data-testid={`group-card-${g.id}`}>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                  <FolderOpen className="w-5 h-5 text-blue-400" />
-                </div>
-                {isSudoOrAdmin && (
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => setMembersOpen(g.id)} data-testid={`button-members-${g.id}`}>
-                      <Users className="w-4 h-4" />
-                    </Button>
-                    {currentUser?.role === "sudo" && (
-                      <>
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(g)} data-testid={`button-edit-group-${g.id}`}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMut.mutate(g.id)} data-testid={`button-delete-group-${g.id}`}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="mt-3">
-                <p className="font-semibold text-foreground">{g.name}</p>
-                <p className="text-xs text-muted-foreground mt-1">Login: <span className="font-mono">{g.login}</span></p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {!isLoading && groups?.length === 0 && (
-          <div className="col-span-full py-16 text-center text-muted-foreground">
-            <FolderOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>Hali guruhlar yo'q</p>
-          </div>
         )}
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? "Guruhni tahrirlash" : "Yangi guruh"}</DialogTitle>
+            <DialogTitle>
+              {assignType === "admin" ? "Adminlarni biriktirish" : "Ishchilarni biriktirish"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedGroup?.name} guruhiga {assignType === "admin" ? "adminlar" : "ishchilar"} tanlang.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Guruh nomi</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ofis" data-testid="input-group-name" />
-            </div>
-            <div className="space-y-2">
-              <Label>Login</Label>
-              <Input value={form.login} onChange={(e) => setForm({ ...form, login: e.target.value })} placeholder="ofis_group" data-testid="input-group-login" />
-            </div>
-            <div className="space-y-2">
-              <Label>{editing ? "Yangi parol (ixtiyoriy)" : "Parol"}</Label>
-              <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" data-testid="input-group-password" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Bekor</Button>
-            <Button onClick={handleSubmit} disabled={createMut.isPending || updateMut.isPending} data-testid="button-save-group">
-              {editing ? "Saqlash" : "Qo'shish"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Guruhga qo'shilish</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Guruh logini</Label>
-              <Input value={joinForm.login} onChange={(e) => setJoinForm({ ...joinForm, login: e.target.value })} placeholder="ofis_group" data-testid="input-join-login" />
-            </div>
-            <div className="space-y-2">
-              <Label>Guruh paroli</Label>
-              <Input type="password" value={joinForm.password} onChange={(e) => setJoinForm({ ...joinForm, password: e.target.value })} placeholder="••••••••" data-testid="input-join-password" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setJoinOpen(false)}>Bekor</Button>
-            <Button onClick={() => joinMut.mutate(joinForm)} disabled={joinMut.isPending} data-testid="button-confirm-join">
-              Qo'shilish
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!membersOpen} onOpenChange={() => { setMembersOpen(null); setAddMemberUserId(""); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Guruh a'zolari</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="divide-y divide-border/40">
-              {members?.map((m) => (
-                <div key={m.id} className="flex items-center justify-between py-2">
-                  <span className="text-sm font-medium">{m.username}</span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">{m.role}</Badge>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeMemberMut.mutate({ groupId: membersOpen!, userId: m.id })}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+          <ScrollArea className="h-72 pr-4">
+            <div className="space-y-3">
+              {filteredUsers.map((user) => (
+                <div key={user.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50 transition-colors">
+                  <Checkbox 
+                    id={user.id} 
+                    checked={selectedUsers.includes(user.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedUsers([...selectedUsers, user.id]);
+                      } else {
+                        setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                      }
+                    }}
+                    data-testid={`checkbox-user-${user.id}`}
+                  />
+                  <label 
+                    htmlFor={user.id} 
+                    className="flex-1 text-sm font-medium leading-none cursor-pointer"
+                  >
+                    {user.fullName}
+                    <span className="block text-xs text-muted-foreground font-normal mt-0.5">
+                      {user.username || user.faceUserId}
+                    </span>
+                  </label>
                 </div>
               ))}
-              {members?.length === 0 && <p className="text-sm text-muted-foreground py-2 text-center">Hali a'zolar yo'q</p>}
+              {filteredUsers.length === 0 && (
+                <p className="text-sm text-center text-muted-foreground py-10">
+                  Biriktirish uchun foydalanuvchilar topilmadi
+                </p>
+              )}
             </div>
-            {isSudoOrAdmin && allUsers && (
-              <div className="flex gap-2 pt-2 border-t border-border/50">
-                <Select value={addMemberUserId} onValueChange={setAddMemberUserId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Foydalanuvchi tanlang" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allUsers.filter(u => !members?.find(m => m.id === u.id)).map((u) => (
-                      <SelectItem key={u.id} value={u.id}>{u.username}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button size="default" onClick={() => { if (addMemberUserId && membersOpen) { addMemberMut.mutate({ groupId: membersOpen, userId: addMemberUserId }); setAddMemberUserId(""); } }}>
-                  <UserPlus className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button 
+              onClick={() => {
+                if (selectedGroup) {
+                  assignMutation.mutate({ 
+                    groupId: selectedGroup.id, 
+                    type: assignType, 
+                    userIds: selectedUsers 
+                  });
+                }
+              }}
+              disabled={assignMutation.isPending}
+              data-testid="button-save-assignments"
+            >
+              {assignMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Saqlash
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

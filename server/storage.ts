@@ -1,255 +1,339 @@
 import {
-  type User, type InsertUser, type Group, type InsertGroup,
-  type Device, type InsertDevice, type Event, type InsertEvent,
-  type GroupMember, type WorkSchedule,
-  users, groups, groupMembers, devices, events, workSchedules
+  type User, type InsertUser,
+  type Group, type InsertGroup,
+  type GroupAdmin, type GroupWorker,
+  type Shift, type InsertShift,
+  type Holiday, type InsertHoliday,
+  type Device, type InsertDevice,
+  type Event, type InsertEvent,
+  type NotificationConfig, type InsertNotificationConfig,
+  type UserSession,
+  users, groups, groupAdmins, groupWorkers, shifts, holidays,
+  devices, events, notificationConfigs, userSessions,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, lte, like, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, ne } from "drizzle-orm";
 
 export interface IStorage {
+  // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByFaceId(faceUserId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
+  getAllAdmins(): Promise<User[]>;
+  getAllWorkers(): Promise<User[]>;
 
+  // Groups
   getGroup(id: string): Promise<Group | undefined>;
-  getGroupByLogin(login: string): Promise<Group | undefined>;
   getAllGroups(): Promise<Group[]>;
   createGroup(group: InsertGroup): Promise<Group>;
   updateGroup(id: string, data: Partial<InsertGroup>): Promise<Group | undefined>;
   deleteGroup(id: string): Promise<void>;
 
-  getGroupMembers(groupId: string): Promise<GroupMember[]>;
-  getUserGroups(userId: string): Promise<Group[]>;
-  addUserToGroup(groupId: string, userId: string): Promise<void>;
-  removeUserFromGroup(groupId: string, userId: string): Promise<void>;
-  isUserInGroup(groupId: string, userId: string): Promise<boolean>;
+  // Group Admins
+  getGroupAdmins(groupId: string): Promise<User[]>;
+  getAdminGroups(adminId: string): Promise<Group[]>;
+  assignAdminToGroup(groupId: string, adminId: string): Promise<void>;
+  removeAdminFromGroup(groupId: string, adminId: string): Promise<void>;
 
+  // Group Workers
+  getGroupWorkers(groupId: string): Promise<User[]>;
+  getWorkerGroups(workerId: string): Promise<Group[]>;
+  addWorkerToGroup(groupId: string, workerId: string): Promise<void>;
+  removeWorkerFromGroup(groupId: string, workerId: string): Promise<void>;
+  removeWorkerFromAllGroups(workerId: string): Promise<void>;
+
+  // Shifts
+  getShifts(groupId: string): Promise<Shift[]>;
+  getAllShifts(): Promise<Shift[]>;
+  createShift(shift: InsertShift): Promise<Shift>;
+  updateShift(id: string, data: Partial<InsertShift>): Promise<Shift | undefined>;
+  deleteShift(id: string): Promise<void>;
+
+  // Holidays
+  getHolidays(): Promise<Holiday[]>;
+  getHolidayByDate(date: string): Promise<Holiday | undefined>;
+  createHoliday(holiday: InsertHoliday): Promise<Holiday>;
+  deleteHoliday(id: string): Promise<void>;
+
+  // Devices
   getDevice(id: string): Promise<Device | undefined>;
-  getDeviceByIdentifier(identifier: string): Promise<Device | undefined>;
   getAllDevices(): Promise<Device[]>;
   createDevice(device: InsertDevice): Promise<Device>;
   updateDevice(id: string, data: Partial<InsertDevice>): Promise<Device | undefined>;
   deleteDevice(id: string): Promise<void>;
 
-  createEvent(event: InsertEvent): Promise<Event>;
-  getEvents(filters?: {
-    search?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    deviceId?: string;
-    groupId?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<{ events: Event[]; total: number }>;
-  deleteEvent(id: string): Promise<void>;
-  getEventsByDateRange(dateFrom: string, dateTo: string, personName?: string): Promise<Event[]>;
+  // Events
+  createEvent(event: InsertEvent & { faceUserId: string; resolvedName: string }): Promise<Event>;
+  getEvents(filters?: { faceUserId?: string; deviceId?: string; from?: Date; to?: Date; limit?: number; offset?: number }): Promise<{ events: Event[]; total: number }>;
+  getFirstEventOfDay(faceUserId: string, date: string, type: "enter" | "exit"): Promise<Event | undefined>;
+  markFirstEvent(id: string, type: "enter" | "exit"): Promise<void>;
+  getRecentEvents(limit?: number): Promise<Event[]>;
+  getWorkerEvents(faceUserId: string, from: Date, to: Date): Promise<Event[]>;
 
-  getWorkSchedule(personName: string): Promise<WorkSchedule | undefined>;
-  getAllWorkSchedules(): Promise<WorkSchedule[]>;
-  upsertWorkSchedule(data: { personName: string; workStart: string; workEnd: string }): Promise<WorkSchedule>;
+  // Notification Configs
+  getNotificationConfig(groupId: string): Promise<NotificationConfig | undefined>;
+  upsertNotificationConfig(config: InsertNotificationConfig): Promise<NotificationConfig>;
+
+  // Sessions (single session enforcement)
+  getUserSession(userId: string): Promise<UserSession | undefined>;
+  upsertUserSession(userId: string, sessionId: string): Promise<void>;
+  deleteUserSession(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+  // Users
+  async getUser(id: string) {
+    return db.select().from(users).where(eq(users.id, id)).then(r => r[0]);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+  async getUserByUsername(username: string) {
+    return db.select().from(users).where(eq(users.username, username)).then(r => r[0]);
   }
 
-  async createUser(user: InsertUser): Promise<User> {
-    const [created] = await db.insert(users).values(user).returning();
-    return created;
+  async getUserByFaceId(faceUserId: string) {
+    return db.select().from(users).where(eq(users.faceUserId, faceUserId)).then(r => r[0]);
   }
 
-  async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
-    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
-    return updated;
+  async createUser(user: InsertUser) {
+    return db.insert(users).values(user).returning().then(r => r[0]);
   }
 
-  async deleteUser(id: string): Promise<void> {
+  async updateUser(id: string, data: Partial<InsertUser>) {
+    return db.update(users).set(data).where(eq(users.id, id)).returning().then(r => r[0]);
+  }
+
+  async deleteUser(id: string) {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  async getAllUsers(): Promise<User[]> {
+  async getAllUsers() {
     return db.select().from(users).orderBy(users.createdAt);
   }
 
-  async getGroup(id: string): Promise<Group | undefined> {
-    const [group] = await db.select().from(groups).where(eq(groups.id, id));
-    return group;
+  async getAllAdmins() {
+    return db.select().from(users).where(eq(users.role, "admin")).orderBy(users.createdAt);
   }
 
-  async getGroupByLogin(login: string): Promise<Group | undefined> {
-    const [group] = await db.select().from(groups).where(eq(groups.login, login));
-    return group;
+  async getAllWorkers() {
+    return db.select().from(users).where(eq(users.role, "worker")).orderBy(users.fullName);
   }
 
-  async getAllGroups(): Promise<Group[]> {
+  // Groups
+  async getGroup(id: string) {
+    return db.select().from(groups).where(eq(groups.id, id)).then(r => r[0]);
+  }
+
+  async getAllGroups() {
     return db.select().from(groups).orderBy(groups.createdAt);
   }
 
-  async createGroup(group: InsertGroup): Promise<Group> {
-    const [created] = await db.insert(groups).values(group).returning();
-    return created;
+  async createGroup(group: InsertGroup) {
+    return db.insert(groups).values(group).returning().then(r => r[0]);
   }
 
-  async updateGroup(id: string, data: Partial<InsertGroup>): Promise<Group | undefined> {
-    const [updated] = await db.update(groups).set(data).where(eq(groups.id, id)).returning();
-    return updated;
+  async updateGroup(id: string, data: Partial<InsertGroup>) {
+    return db.update(groups).set(data).where(eq(groups.id, id)).returning().then(r => r[0]);
   }
 
-  async deleteGroup(id: string): Promise<void> {
+  async deleteGroup(id: string) {
     await db.delete(groups).where(eq(groups.id, id));
   }
 
-  async getGroupMembers(groupId: string): Promise<GroupMember[]> {
-    return db.select().from(groupMembers).where(eq(groupMembers.groupId, groupId));
+  // Group Admins
+  async getGroupAdmins(groupId: string) {
+    const rows = await db.select({ user: users }).from(groupAdmins)
+      .innerJoin(users, eq(groupAdmins.adminId, users.id))
+      .where(eq(groupAdmins.groupId, groupId));
+    return rows.map(r => r.user);
   }
 
-  async getUserGroups(userId: string): Promise<Group[]> {
-    const members = await db.select().from(groupMembers).where(eq(groupMembers.userId, userId));
-    if (members.length === 0) return [];
-    const result: Group[] = [];
-    for (const member of members) {
-      const [group] = await db.select().from(groups).where(eq(groups.id, member.groupId));
-      if (group) result.push(group);
-    }
-    return result;
+  async getAdminGroups(adminId: string) {
+    const rows = await db.select({ group: groups }).from(groupAdmins)
+      .innerJoin(groups, eq(groupAdmins.groupId, groups.id))
+      .where(eq(groupAdmins.adminId, adminId));
+    return rows.map(r => r.group);
   }
 
-  async addUserToGroup(groupId: string, userId: string): Promise<void> {
-    await db.insert(groupMembers).values({ groupId, userId }).onConflictDoNothing();
+  async assignAdminToGroup(groupId: string, adminId: string) {
+    await db.insert(groupAdmins).values({ groupId, adminId }).onConflictDoNothing();
   }
 
-  async removeUserFromGroup(groupId: string, userId: string): Promise<void> {
-    await db.delete(groupMembers).where(
-      and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId))
-    );
+  async removeAdminFromGroup(groupId: string, adminId: string) {
+    await db.delete(groupAdmins).where(and(eq(groupAdmins.groupId, groupId), eq(groupAdmins.adminId, adminId)));
   }
 
-  async isUserInGroup(groupId: string, userId: string): Promise<boolean> {
-    const [member] = await db.select().from(groupMembers).where(
-      and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId))
-    );
-    return !!member;
+  // Group Workers
+  async getGroupWorkers(groupId: string) {
+    const rows = await db.select({ user: users }).from(groupWorkers)
+      .innerJoin(users, eq(groupWorkers.workerId, users.id))
+      .where(eq(groupWorkers.groupId, groupId))
+      .orderBy(users.fullName);
+    return rows.map(r => r.user);
   }
 
-  async getDevice(id: string): Promise<Device | undefined> {
-    const [device] = await db.select().from(devices).where(eq(devices.id, id));
-    return device;
+  async getWorkerGroups(workerId: string) {
+    const rows = await db.select({ group: groups }).from(groupWorkers)
+      .innerJoin(groups, eq(groupWorkers.groupId, groups.id))
+      .where(eq(groupWorkers.workerId, workerId));
+    return rows.map(r => r.group);
   }
 
-  async getDeviceByIdentifier(identifier: string): Promise<Device | undefined> {
-    const [device] = await db.select().from(devices).where(eq(devices.deviceIdentifier, identifier));
-    return device;
+  async addWorkerToGroup(groupId: string, workerId: string) {
+    await db.insert(groupWorkers).values({ groupId, workerId }).onConflictDoNothing();
   }
 
-  async getAllDevices(): Promise<Device[]> {
+  async removeWorkerFromGroup(groupId: string, workerId: string) {
+    await db.delete(groupWorkers).where(and(eq(groupWorkers.groupId, groupId), eq(groupWorkers.workerId, workerId)));
+  }
+
+  async removeWorkerFromAllGroups(workerId: string) {
+    await db.delete(groupWorkers).where(eq(groupWorkers.workerId, workerId));
+  }
+
+  // Shifts
+  async getShifts(groupId: string) {
+    return db.select().from(shifts).where(eq(shifts.groupId, groupId)).orderBy(shifts.startTime);
+  }
+
+  async getAllShifts() {
+    return db.select().from(shifts).orderBy(shifts.groupId, shifts.startTime);
+  }
+
+  async createShift(shift: InsertShift) {
+    return db.insert(shifts).values(shift).returning().then(r => r[0]);
+  }
+
+  async updateShift(id: string, data: Partial<InsertShift>) {
+    return db.update(shifts).set(data).where(eq(shifts.id, id)).returning().then(r => r[0]);
+  }
+
+  async deleteShift(id: string) {
+    await db.delete(shifts).where(eq(shifts.id, id));
+  }
+
+  // Holidays
+  async getHolidays() {
+    return db.select().from(holidays).orderBy(holidays.date);
+  }
+
+  async getHolidayByDate(date: string) {
+    return db.select().from(holidays).where(eq(holidays.date, date)).then(r => r[0]);
+  }
+
+  async createHoliday(holiday: InsertHoliday) {
+    return db.insert(holidays).values(holiday).returning().then(r => r[0]);
+  }
+
+  async deleteHoliday(id: string) {
+    await db.delete(holidays).where(eq(holidays.id, id));
+  }
+
+  // Devices
+  async getDevice(id: string) {
+    return db.select().from(devices).where(eq(devices.id, id)).then(r => r[0]);
+  }
+
+  async getAllDevices() {
     return db.select().from(devices).orderBy(devices.createdAt);
   }
 
-  async createDevice(device: InsertDevice): Promise<Device> {
-    const [created] = await db.insert(devices).values(device).returning();
-    return created;
+  async createDevice(device: InsertDevice) {
+    return db.insert(devices).values(device).returning().then(r => r[0]);
   }
 
-  async updateDevice(id: string, data: Partial<InsertDevice>): Promise<Device | undefined> {
-    const [updated] = await db.update(devices).set(data).where(eq(devices.id, id)).returning();
-    return updated;
+  async updateDevice(id: string, data: Partial<InsertDevice>) {
+    return db.update(devices).set(data).where(eq(devices.id, id)).returning().then(r => r[0]);
   }
 
-  async deleteDevice(id: string): Promise<void> {
+  async deleteDevice(id: string) {
     await db.delete(devices).where(eq(devices.id, id));
   }
 
-  async createEvent(event: InsertEvent): Promise<Event> {
-    const [created] = await db.insert(events).values(event).returning();
-    return created;
+  // Events
+  async createEvent(event: InsertEvent & { faceUserId: string; resolvedName: string }) {
+    return db.insert(events).values(event).returning().then(r => r[0]);
   }
 
-  async getEvents(filters?: {
-    search?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    deviceId?: string;
-    groupId?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<{ events: Event[]; total: number }> {
-    const conditions: any[] = [];
+  async getEvents(filters?: { faceUserId?: string; deviceId?: string; from?: Date; to?: Date; limit?: number; offset?: number }) {
+    const conditions = [];
+    if (filters?.faceUserId) conditions.push(eq(events.faceUserId, filters.faceUserId));
+    if (filters?.deviceId) conditions.push(eq(events.deviceId, filters.deviceId));
+    if (filters?.from) conditions.push(gte(events.timestamp, filters.from));
+    if (filters?.to) conditions.push(lte(events.timestamp, filters.to));
 
-    if (filters?.search) {
-      conditions.push(like(events.personName, `%${filters.search}%`));
-    }
-    if (filters?.dateFrom) {
-      conditions.push(gte(events.timestamp, new Date(filters.dateFrom)));
-    }
-    if (filters?.dateTo) {
-      const dateTo = new Date(filters.dateTo);
-      dateTo.setHours(23, 59, 59, 999);
-      conditions.push(lte(events.timestamp, dateTo));
-    }
-    if (filters?.deviceId) {
-      conditions.push(eq(events.deviceId, filters.deviceId));
-    }
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const limit = filters?.limit ?? 50;
+    const offset = filters?.offset ?? 0;
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const [evList, countRes] = await Promise.all([
+      db.select().from(events).where(where).orderBy(desc(events.timestamp)).limit(limit).offset(offset),
+      db.select({ count: sql<number>`count(*)` }).from(events).where(where),
+    ]);
 
-    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(events).where(whereClause);
-    const total = Number(countResult.count);
-
-    const eventsData = await db.select().from(events)
-      .where(whereClause)
-      .orderBy(desc(events.timestamp))
-      .limit(filters?.limit ?? 50)
-      .offset(filters?.offset ?? 0);
-
-    return { events: eventsData, total };
+    return { events: evList, total: Number(countRes[0].count) };
   }
 
-  async deleteEvent(id: string): Promise<void> {
-    await db.delete(events).where(eq(events.id, id));
+  async getFirstEventOfDay(faceUserId: string, date: string, type: "enter" | "exit") {
+    const dayStart = new Date(date + "T00:00:00");
+    const dayEnd = new Date(date + "T23:59:59");
+    const field = type === "enter" ? events.isFirstEnter : events.isFirstExit;
+    const r = await db.select().from(events).where(
+      and(
+        eq(events.faceUserId, faceUserId),
+        eq(events.eventType, type),
+        eq(field, true),
+        gte(events.timestamp, dayStart),
+        lte(events.timestamp, dayEnd),
+      )
+    ).limit(1);
+    return r[0];
   }
 
-  async getEventsByDateRange(dateFrom: string, dateTo: string, personName?: string): Promise<Event[]> {
-    const conditions: any[] = [
-      gte(events.timestamp, new Date(dateFrom)),
-      lte(events.timestamp, new Date(dateTo + "T23:59:59.999Z")),
-    ];
-    if (personName) {
-      conditions.push(eq(events.personName, personName));
+  async markFirstEvent(id: string, type: "enter" | "exit") {
+    if (type === "enter") {
+      await db.update(events).set({ isFirstEnter: true }).where(eq(events.id, id));
+    } else {
+      await db.update(events).set({ isFirstExit: true }).where(eq(events.id, id));
     }
-    return db.select().from(events).where(and(...conditions)).orderBy(events.personName, events.timestamp);
   }
 
-  async getWorkSchedule(personName: string): Promise<WorkSchedule | undefined> {
-    const [schedule] = await db.select().from(workSchedules).where(eq(workSchedules.personName, personName));
-    return schedule;
+  async getRecentEvents(limit = 30) {
+    return db.select().from(events).orderBy(desc(events.timestamp)).limit(limit);
   }
 
-  async getAllWorkSchedules(): Promise<WorkSchedule[]> {
-    return db.select().from(workSchedules);
+  async getWorkerEvents(faceUserId: string, from: Date, to: Date) {
+    return db.select().from(events).where(
+      and(eq(events.faceUserId, faceUserId), gte(events.timestamp, from), lte(events.timestamp, to))
+    ).orderBy(desc(events.timestamp));
   }
 
-  async upsertWorkSchedule(data: { personName: string; workStart: string; workEnd: string }): Promise<WorkSchedule> {
-    const existing = await this.getWorkSchedule(data.personName);
-    if (existing) {
-      const [updated] = await db.update(workSchedules)
-        .set({ workStart: data.workStart, workEnd: data.workEnd })
-        .where(eq(workSchedules.personName, data.personName))
-        .returning();
-      return updated;
-    }
-    const [created] = await db.insert(workSchedules).values(data).returning();
-    return created;
+  // Notification Configs
+  async getNotificationConfig(groupId: string) {
+    return db.select().from(notificationConfigs).where(eq(notificationConfigs.groupId, groupId)).then(r => r[0]);
+  }
+
+  async upsertNotificationConfig(config: InsertNotificationConfig) {
+    return db.insert(notificationConfigs).values(config)
+      .onConflictDoUpdate({ target: notificationConfigs.groupId, set: { enterMessage: config.enterMessage, exitMessage: config.exitMessage } })
+      .returning().then(r => r[0]);
+  }
+
+  // Sessions
+  async getUserSession(userId: string) {
+    return db.select().from(userSessions).where(eq(userSessions.userId, userId)).then(r => r[0]);
+  }
+
+  async upsertUserSession(userId: string, sessionId: string) {
+    await db.insert(userSessions).values({ userId, sessionId })
+      .onConflictDoUpdate({ target: userSessions.userId, set: { sessionId } });
+  }
+
+  async deleteUserSession(userId: string) {
+    await db.delete(userSessions).where(eq(userSessions.userId, userId));
   }
 }
 

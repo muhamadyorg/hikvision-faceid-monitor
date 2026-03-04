@@ -1,0 +1,22 @@
+{
+  "name": "HikVision FaceID Monitor",
+  "short_name": "FaceID",
+  "description": "Hikvision FaceID xavfsizlik monitoringi tizimi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#030712",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

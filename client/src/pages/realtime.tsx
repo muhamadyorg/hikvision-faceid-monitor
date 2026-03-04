@@ -117,7 +117,7 @@ export default function RealtimePage() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-base font-semibold text-foreground">{ev.personName}</p>
+                        <p className="text-base font-semibold text-foreground">{ev.resolvedName || ev.faceUserId || "Noma'lum"}</p>
                         {isNew && (
                           <Badge className="text-xs py-0 h-5 bg-primary/20 text-primary border-primary/30">
                             Yangi

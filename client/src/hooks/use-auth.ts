@@ -4,8 +4,10 @@ import { getQueryFn } from "@/lib/queryClient";
 
 export interface AuthUser {
   id: string;
-  username: string;
-  role: "sudo" | "admin" | "user";
+  username: string | null;
+  fullName: string;
+  faceUserId: string | null;
+  role: "sudo" | "admin" | "worker";
 }
 
 export function useAuth() {
