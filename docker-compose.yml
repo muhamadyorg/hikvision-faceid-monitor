@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: hikvision_db
+      POSTGRES_USER: hikvision
+      POSTGRES_PASSWORD: hikvision_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hikvision -d hikvision_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://hikvision:hikvision_pass@db:5432/hikvision_db
+      SESSION_SECRET: change-this-to-a-secure-random-string
+      NODE_ENV: production
+      PORT: 5000
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
